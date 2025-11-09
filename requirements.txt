@@ -1,0 +1,8 @@
+python-dotenv
+requests
+SpeechRecognition
+pyttsx3
+sentence-transformers
+sqlite-vec
+torch
+pyaudio; platform_system=="Windows"
