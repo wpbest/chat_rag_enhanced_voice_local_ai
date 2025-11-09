@@ -14,3 +14,4 @@ sqlite-vec
 
 # (Optional) Audio I/O dependencies
 pyaudio
+sounddevice

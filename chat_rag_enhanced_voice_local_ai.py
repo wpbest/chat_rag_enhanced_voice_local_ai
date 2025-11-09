@@ -1,6 +1,6 @@
 # chat_rag_enhanced_voice_local_ai.py
 import sys, os, time, struct, sqlite3, logging, re, traceback, json, requests, platform
-import speech_recognition as sr, sqlite_vec, torch, soundfile as sf
+import speech_recognition as sr, sqlite_vec, torch, soundfile as sf, sounddevice as sd
 from kokoro import KPipeline
 from sentence_transformers import SentenceTransformer
 
@@ -199,7 +199,7 @@ def build_messages(memory_items, user_text):
     ]
 
 # ============================================================
-# KOKORO TTS (Offline Replacement)
+# KOKORO TTS (Offline Replacement w/ Direct Playback)
 # ============================================================
 def speak(text: str):
     spoken = sanitize_for_tts(text)
@@ -221,17 +221,9 @@ def speak(text: str):
 
         if audio_chunks:
             full_audio = torch.cat(audio_chunks)
-            filename = "output.wav"
-            sf.write(filename, full_audio, 24000)
-            log.info(f"✅ Audio saved to {filename}")
-
-            # Cross-platform playback
-            if os.name == "nt":
-                os.system(f'start {filename}')
-            elif platform.system() == "Darwin":
-                os.system(f'open {filename}')
-            else:
-                os.system(f'xdg-open {filename}')
+            log.info("🎧 Playing synthesized speech (sounddevice)")
+            sd.play(full_audio.cpu().numpy(), samplerate=24000)
+            sd.wait()
         else:
             log.warning("⚠️ No audio generated.")
     except Exception as e:
