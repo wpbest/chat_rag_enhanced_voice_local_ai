@@ -1,6 +1,7 @@
 # chat_rag_enhanced_voice_local_ai.py
-import sys, os, time, struct, sqlite3, logging, re, traceback, json, requests
-import speech_recognition as sr, pyttsx3, sqlite_vec
+import sys, os, time, struct, sqlite3, logging, re, traceback, json, requests, platform
+import speech_recognition as sr, sqlite_vec, torch, soundfile as sf
+from kokoro import KPipeline
 from sentence_transformers import SentenceTransformer
 
 # ============================================================
@@ -24,14 +25,12 @@ AMBIENT_NOISE_DURATION  = 0.4
 LOG_FILE = "chat_memory.log"
 
 # ============================================================
-# LOGGING — same as before, no buffering issues
+# LOGGING
 # ============================================================
 fmt = "%(asctime)s [%(levelname)s] %(message)s"
 datefmt = "%Y-%m-%d %H:%M:%S"
 log = logging.getLogger("AVA-RAG")
 log.setLevel(logging.INFO)
-
-# clear previous handlers (VSCode re-runs can double-log)
 for h in list(log.handlers):
     log.removeHandler(h)
 
@@ -39,7 +38,6 @@ file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
 file_handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
-
 log.addHandler(file_handler)
 log.addHandler(console_handler)
 log.propagate = False
@@ -201,18 +199,41 @@ def build_messages(memory_items, user_text):
     ]
 
 # ============================================================
-# SPEECH
+# KOKORO TTS (Offline Replacement)
 # ============================================================
 def speak(text: str):
     spoken = sanitize_for_tts(text)
     log.info("🔊 Spoken output:\n" + spoken)
     try:
-        engine = pyttsx3.init()
-        engine.setProperty("rate", 185)
-        engine.setProperty("volume", 1.0)
-        engine.say(spoken)
-        engine.runAndWait()
-        engine.stop()
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        pipeline = KPipeline(lang_code="a")  # American English
+        generator = pipeline(spoken, voice="af_heart")
+
+        audio_chunks = []
+        for gs, ps, audio in generator:
+            try:
+                gs_val = float(gs)
+                ps_val = float(ps)
+                log.info(f"  Chunk: Gen speed {gs_val:.2f}x | Pron speed {ps_val:.2f}x")
+            except Exception:
+                log.info(f"  Chunk: Gen speed {gs} | Pron speed {ps}")
+            audio_chunks.append(audio)
+
+        if audio_chunks:
+            full_audio = torch.cat(audio_chunks)
+            filename = "output.wav"
+            sf.write(filename, full_audio, 24000)
+            log.info(f"✅ Audio saved to {filename}")
+
+            # Cross-platform playback
+            if os.name == "nt":
+                os.system(f'start {filename}')
+            elif platform.system() == "Darwin":
+                os.system(f'open {filename}')
+            else:
+                os.system(f'xdg-open {filename}')
+        else:
+            log.warning("⚠️ No audio generated.")
     except Exception as e:
         log.error(f"TTS error: {e}\n{traceback.format_exc()}")
 

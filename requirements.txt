@@ -1,8 +1,16 @@
-python-dotenv
-requests
-SpeechRecognition
-pyttsx3
-sentence-transformers
-sqlite-vec
+# Core libraries
 torch
-pyaudio; platform_system=="Windows"
+soundfile
+kokoro
+
+# Speech recognition
+SpeechRecognition
+
+# Embedding model
+sentence-transformers
+
+# SQLite vector search
+sqlite-vec
+
+# (Optional) Audio I/O dependencies
+pyaudio
